@@ -1,10 +1,8 @@
 {-|
 Module      : Test.Tasty.Lua.Translate
-Copyright   : © 2019–2020 Albert Krewinkel
+Copyright   : © 2019–2022 Albert Krewinkel
 License     : MIT
 Maintainer  : Albert Krewinkel <albert+hslua@zeitkraut.de>
-Stability   : alpha
-Portability : Requires GHC
 
 Translate test results from Lua into a Tasty @'TestTree'@.
 -}
@@ -14,7 +12,7 @@ module Test.Tasty.Lua.Translate
   )
 where
 
-import Foreign.Lua (Lua)
+import HsLua.Core (LuaE, LuaError)
 import Test.Tasty.Lua.Core (Outcome (..), ResultTree (..), UnnamedTree (..),
                             runTastyFile)
 import qualified Test.Tasty as Tasty
@@ -22,12 +20,10 @@ import qualified Test.Tasty.Providers as Tasty
 
 -- | Run tasty.lua tests from the given file and translate the result
 -- into a mock Tasty @'TestTree'@.
-translateResultsFromFile :: FilePath -> Lua Tasty.TestTree
-translateResultsFromFile fp = do
-  result <- runTastyFile fp
-  case result of
-    Left errMsg -> return $ pathFailure fp errMsg
-    Right tree  -> return $ Tasty.testGroup fp (map testTree tree)
+translateResultsFromFile :: LuaError e => FilePath -> LuaE e Tasty.TestTree
+translateResultsFromFile fp = runTastyFile fp >>= \case
+  Left errMsg -> return $ pathFailure fp errMsg
+  Right tree  -> return $ Tasty.testGroup fp (map testTree tree)
 
 -- | Report failure of testing a path.
 pathFailure :: FilePath -> String -> Tasty.TestTree
@@ -53,5 +49,3 @@ instance Tasty.IsTest MockTest where
     Failure msg -> Tasty.testFailed msg
 
   testOptions = return []
-
-
