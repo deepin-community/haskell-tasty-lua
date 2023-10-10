@@ -1,11 +1,10 @@
+{-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-|
 Module      : Test.Tasty.Lua.Module
-Copyright   : © 2019–2020 Albert Krewinkel
+Copyright   : © 2019–2022 Albert Krewinkel
 License     : MIT
 Maintainer  : Albert Krewinkel <albert+hslua@zeitkraut.de>
-Stability   : alpha
-Portability : Requires TemplateHaskell
 
 Tasty Lua module, providing the functions necessary to write tasty tests
 in Lua scripts.
@@ -16,17 +15,24 @@ where
 
 import Data.ByteString (ByteString)
 import Data.FileEmbed
-import Foreign.Lua (Lua, NumResults, Status (OK), dostring, throwTopMessage)
+import HsLua.Core
+  ( HaskellFunction, LuaError, NumResults (..), Status (OK)
+  , dostringTrace, nth, rawset, throwErrorAsException )
+import HsLua.Marshalling (pushName)
+import Test.Tasty.Lua.Arbitrary
 
 -- | Tasty Lua script
 tastyScript :: ByteString
 tastyScript = $(embedFile "tasty.lua")
 
--- | Push the Aeson module on the Lua stack.
-pushModule :: Lua NumResults
-pushModule = do
-  result <- dostring tastyScript
-  if result == OK
-    then return 1
-    else throwTopMessage
+-- | Push the tasty module on the Lua stack.
+pushModule :: LuaError e => HaskellFunction e
+pushModule = dostringTrace tastyScript >>= \case
+  OK -> NumResults 1 <$ do
+    -- add `arbitrary` table
+    pushName "arbitrary"
+    pushArbitraryTable
+    rawset (nth 3)
+    registerDefaultGenerators
+  _  -> throwErrorAsException
 {-# INLINABLE pushModule #-}
